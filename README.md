@@ -1,23 +1,29 @@
 # B站时光机 2018—2020
 
-一个可直接部署到 GitHub Pages 的纯静态网站。无需安装依赖或执行构建命令。
-
-## 部署到 GitHub Pages
-
-1. 在 GitHub 新建一个 **Public** 仓库，例如 `bilibili-time-capsule`。
-2. 解压本压缩包，将 `index.html` 和 `README.md` 上传到仓库根目录并提交。
-3. 打开仓库的 **Settings → Pages**。
-4. 在 **Build and deployment** 下将 **Source** 设为 `Deploy from a branch`。
-5. Branch 选择 `main`，目录选择 `/ (root)`，点击 **Save**。
-6. 等待约 1—3 分钟，GitHub 会显示网站链接。
-
-最终网址通常是：`https://你的用户名.github.io/bilibili-time-capsule/`
+一个搜索真实 B 站视频的时间胶囊网站。搜索范围由服务端固定在 2018 年 1 月 1 日至 2020 年 12 月 31 日，所有结果卡片都会跳转到对应的 B 站 BV 页面。
 
 ## 功能
 
-- 只包含 2018—2020 年的演示视频数据
-- 支持关键词搜索、年份筛选和分区筛选
+- 搜索真实的 B 站视频
+- 严格限制 2018—2020 年发布时间
+- 展示真实标题、封面、UP 主、播放量、弹幕数和发布时间
+- 支持按 2018、2019、2020 单年筛选
+- 点击卡片在新标签页打开对应 B 站视频
 - 支持电脑和手机页面
-- 所有代码包含在单个 `index.html` 中
 
-> 非哔哩哔哩官方网站；演示内容仅用于页面展示。
+## 项目结构
+
+- `index.html`：部署在 GitHub Pages 的网页
+- `aliyun-fc/index.js`：运行在阿里云函数计算 FC 3.0 的搜索后端
+- `aliyun-fc/README.txt`：阿里云函数配置说明
+
+## 部署
+
+1. 创建阿里云 FC 3.0 事件函数，选择 Node.js 20，处理程序为 `index.handler`。
+2. 上传 `aliyun-fc` 目录中的代码，并创建允许 GET、OPTIONS 的公开 HTTP 触发器。
+3. 将 HTTP 触发器地址写入 `index.html` 的 `API_BASE`。
+4. 将网页提交到 `main` 和 `gh-pages` 分支。
+
+## 说明
+
+本项目为非官方概念站，与哔哩哔哩无隶属关系。视频信息来自 B 站公开搜索响应，接口规则变化时可能需要维护。
