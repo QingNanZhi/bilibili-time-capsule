@@ -80,8 +80,7 @@ async function getMixinKey() {
   }
 }
 
-async function signedSearchUrl(params) {
-  const mixinKey = await getMixinKey();
+async function signedSearchUrl(params, mixinKey) {
   params.wts = String(Math.floor(Date.now() / 1000));
   const query = Object.keys(params)
     .sort()
@@ -89,6 +88,25 @@ async function signedSearchUrl(params) {
     .join("&");
   const signature = createHash("md5").update(query + mixinKey).digest("hex");
   return `https://api.bilibili.com/x/web-interface/wbi/search/type?${query}&w_rid=${signature}`;
+}
+
+async function searchBilibili({ keyword, start, end, order, page = 1, pageSize = 24, mixinKey }) {
+  const url = await signedSearchUrl({
+    search_type: "video",
+    keyword,
+    order,
+    page: String(page),
+    page_size: String(pageSize),
+    pubtime_begin_s: String(start),
+    pubtime_end_s: String(end),
+  }, mixinKey);
+  const upstream = await fetch(url, { headers: UPSTREAM_HEADERS });
+  if (!upstream.ok) throw new Error(`B站接口返回 ${upstream.status}`);
+  const payload = await upstream.json();
+  if (payload.code !== 0 || !payload.data) {
+    throw new Error(payload.message || "搜索接口暂不可用");
+  }
+  return payload.data;
 }
 
 exports.handler = async function handler(rawEvent) {
@@ -101,32 +119,31 @@ exports.handler = async function handler(rawEvent) {
   const query = event.queryParameters || {};
   const keyword = String(query.q || "").trim();
   const year = String(query.year || "all");
+  const sort = String(query.sort || "latest");
   const page = Math.min(Math.max(Number(query.page) || 1, 1), 50);
 
   if (!keyword || keyword.length > 50) {
     return response(400, { error: "请输入 1—50 个字符的关键词" });
   }
   if (!DATE_RANGES[year]) return response(400, { error: "年份参数无效" });
+  if (!["views", "latest"].includes(sort)) {
+    return response(400, { error: "排序参数无效" });
+  }
 
   const [start, end] = DATE_RANGES[year];
   try {
-    const url = await signedSearchUrl({
-      search_type: "video",
+    const mixinKey = await getMixinKey();
+    const data = await searchBilibili({
       keyword,
-      order: "pubdate",
-      page: String(page),
-      page_size: "24",
-      pubtime_begin_s: String(start),
-      pubtime_end_s: String(end),
+      start,
+      end,
+      order: sort === "views" ? "click" : "pubdate",
+      page,
+      pageSize: 24,
+      mixinKey,
     });
-    const upstream = await fetch(url, { headers: UPSTREAM_HEADERS });
-    if (!upstream.ok) throw new Error(`B站接口返回 ${upstream.status}`);
-    const payload = await upstream.json();
-    if (payload.code !== 0 || !payload.data?.result) {
-      throw new Error(payload.message || "搜索接口暂不可用");
-    }
 
-    const videos = payload.data.result
+    const videos = (data.result || [])
       .filter((video) => video.pubdate >= start && video.pubdate <= end && /^BV[0-9A-Za-z]+$/.test(video.bvid || ""))
       .map((video) => ({
         bvid: video.bvid,
@@ -146,8 +163,9 @@ exports.handler = async function handler(rawEvent) {
       {
         keyword,
         year,
+        sort,
         page,
-        total: Number(payload.data.numResults) || videos.length,
+        total: Number(data.numResults) || videos.length,
         videos,
       },
       { "Cache-Control": "public, max-age=60" },
