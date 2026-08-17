@@ -126,7 +126,7 @@ exports.handler = async function handler(rawEvent) {
     return response(400, { error: "请输入 1—50 个字符的关键词" });
   }
   if (!DATE_RANGES[year]) return response(400, { error: "年份参数无效" });
-  if (!["views", "latest"].includes(sort)) {
+  if (!["relevance", "views", "latest"].includes(sort)) {
     return response(400, { error: "排序参数无效" });
   }
 
@@ -137,7 +137,7 @@ exports.handler = async function handler(rawEvent) {
       keyword,
       start,
       end,
-      order: sort === "views" ? "click" : "pubdate",
+      order: sort === "relevance" ? "totalrank" : sort === "views" ? "click" : "pubdate",
       page,
       pageSize: 24,
       mixinKey,
